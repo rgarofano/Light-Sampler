@@ -1,56 +1,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 #include "UserButton.h"
-#include "Joystick.h"
 #include "LEDMatrix.h"
+#include "Sleep.h"
+#include "Sampler.h"
 
 #define BUTTON_CHECK_DELAY_MS 100
 
-static void sleepForMs(long long delayInMs)
-{
-    const long long NS_PER_MS = 1000 * 1000;
-    const long long NS_PER_SECOND = 1000000000;
-    long long delayNs = delayInMs * NS_PER_MS;
-    int seconds = delayNs / NS_PER_SECOND;
-    int nanoseconds = delayNs % NS_PER_SECOND;
-    struct timespec reqDelay = {seconds, nanoseconds};
-    nanosleep(&reqDelay, (struct timespec *) NULL);
-}
-
-void* checkForButtonPress(void* arg)
+void waitForUserButtonPress(void)
 {
     while(!UserButton_isButtonPressed()) {
-        sleepForMs(BUTTON_CHECK_DELAY_MS);
+        Sleep_waitForMs(BUTTON_CHECK_DELAY_MS);
     }
-    
-    return NULL;
+}
+
+void safeShutdown(void)
+{
+    Sampler_stopSampling();
+    LEDMatrix_clearDisplay();
 }
 
 int main(void) {
 
-    /*** Initialize hardware ***/
-
+    // initialize hardware
     UserButton_initButton();
     LEDMatrix_initMatrix();
     
-    /*** Create thread for the user button ***/
-    
-    // Thread ID
-    pthread_t btnTid;
+    // Start the sampling threads
+    Sampler_startSampling();
 
-    // Create Attributes
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
+    waitForUserButtonPress();
 
-    pthread_create(&btnTid, &attr, checkForButtonPress, NULL);
-
-    // Wait until the button thread is done executing
-    pthread_join(btnTid, NULL);
-
-    LEDMatrix_clearDisplay();
+    // end the program safely
+    safeShutdown();
 
     return 0;
 }
