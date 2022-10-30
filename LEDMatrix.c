@@ -38,14 +38,11 @@ static bitPattern_t digits[10] = {
 static int numberDips;
 static float maxVolts; 
 static float minVolts; 
-static long long minIntreval; 
-static long long maxIntreval;
+static float minIntreval; 
+static float maxIntreval;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static bool shutdown = false;
-
-static void displayInt(int number);
-static void displayFloat(float number);
 
 void LEDMatrix_initMatrix(void)
 {
@@ -90,15 +87,17 @@ static void displayInt(int number)
 
 static void displayFloat(float number)
 {
+    int numberAsInt = (int) (number * 10);
+
     // error handling
-    if (number < 0 || number >= 10) {
+    if (numberAsInt < 0 || numberAsInt > 99) {
         displayFloat(9.9);
         return;
     }
 
     // determine which digits need to be displayed and get the bit patterns for them
-    const int FIRST_DIGIT = (int) number;
-    const int SECOND_DIGIT = (int) ((number - FIRST_DIGIT) * 10);
+    const int FIRST_DIGIT = numberAsInt / 10;
+    const int SECOND_DIGIT = numberAsInt % 10;
     unsigned char* firstDigitBytes = digits[FIRST_DIGIT].bytes;
     unsigned char* secondDigitBytes = digits[SECOND_DIGIT].bytes;
 
@@ -107,7 +106,7 @@ static void displayFloat(float number)
     displayDigits(buff, firstDigitBytes, secondDigitBytes);
 }
 
-void LEDMatrix_updateDisplayValues(int numDips, int maxVoltage, int minVoltage, long long minTimeIntreval, long long maxTimeIntreval)
+void LEDMatrix_updateDisplayValues(int numDips, float maxVoltage, float minVoltage, float minTimeIntreval, float maxTimeIntreval)
 {
     pthread_mutex_lock(&mutex);
     {
@@ -122,7 +121,7 @@ void LEDMatrix_updateDisplayValues(int numDips, int maxVoltage, int minVoltage, 
 
 void* displaySampleData(void* args)
 {
-    Sleep_waitForMs(1001);
+    Sleep_waitForMs(1200);
     while(!shutdown) {
         pthread_mutex_lock(&mutex);
         {

@@ -5,7 +5,7 @@
 
 void LEDMatrix_initMatrix(void);
 void LEDMatrix_startDisplay(void);
-void LEDMatrix_updateDisplayValues(int numDips, int maxVoltage, int minVoltage, long long minTimeIntreval, long long maxTimeIntreval);
+void LEDMatrix_updateDisplayValues(int numDips, float maxVoltage, float minVoltage, float minTimeIntreval, float maxTimeIntreval);
 void LEDMatrix_stopRunning(void);
 
 #endif

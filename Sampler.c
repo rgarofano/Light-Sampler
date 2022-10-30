@@ -26,8 +26,7 @@ static long long getTimeInNs(void)
     clock_gettime(CLOCK_REALTIME, &spec);
     long long seconds = spec.tv_sec;
     long long nanoSeconds = spec.tv_nsec;
-    long long timestamp = seconds * 1000000000
-    + nanoSeconds;
+    long long timestamp = seconds * 1000000000 + nanoSeconds;
     return timestamp;
 }
 
@@ -67,22 +66,22 @@ void* analyzeSamples(void* arg)
     int numDips;
     float maxVoltage;
     float minVoltage;
-    long long minTimeIntreval;
-    long long maxTimeIntreval;
+    float minTimeIntreval;
+    float maxTimeIntreval;
 
     while(!shutdown) {
         Sleep_waitForMs(ANALYZE_SAMPLES_DELAY_MS);
         pthread_mutex_lock(&mutex);
         {
             if (!shutdown) {
-                numDips = Stats_calcNumDips(buffer, numSamples);
                 maxVoltage = Stats_findMaxVoltage(buffer, numSamples);
                 minVoltage = Stats_findMinVoltage(buffer, numSamples);
                 minTimeIntreval = Stats_findMinTimeIntreval(buffer, numSamples);
                 maxTimeIntreval = Stats_findMaxTimeIntreval(buffer, numSamples);
                 float avgVoltage = Stats_calcAverageVoltage(buffer, numSamples);
-                long long avgTimeIntreval = Stats_calcAverageTimeIntreval(buffer, numSamples);
-                printf("Intreval ms (%f, %f) avg = %f Samples V (%f, %f) avg = %f Dips: %d Samples: %d\n"
+                float avgTimeIntreval = Stats_calcAverageTimeIntreval(buffer, numSamples);
+                numDips = Stats_getNumDips(buffer, numSamples);
+                printf("Intreval ms (%f, %f) avg = %f Samples V (%f, %f) avg = %f # Dips: %d Samples: %d\n"
                     , minTimeIntreval, maxTimeIntreval, avgTimeIntreval, minVoltage, maxVoltage, avgVoltage
                     ,  numDips, numSamples);
                 clearBuffer();
