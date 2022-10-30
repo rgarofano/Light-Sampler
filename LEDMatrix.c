@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <pthread.h>
 #include "I2C.h"
+#include "Joystick.h"
+#include "Sleep.h"
 
 #define NUM_BYTES 8
 #define BUFF_SIZE 16
@@ -31,19 +35,24 @@ static bitPattern_t digits[10] = {
     /* 9 */ {{0x00, 0xF3, 0x90, 0x90, 0xF3, 0xD2, 0xD2, 0xF3}}
 };
 
+static int numberDips;
+static float maxVolts; 
+static float minVolts; 
+static long long minIntreval; 
+static long long maxIntreval;
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool shutdown = false;
+
+static void displayInt(int number);
+static void displayFloat(float number);
+
 void LEDMatrix_initMatrix(void)
 {
     I2C_configurePins(LED_MATRIX_IDX);
     I2C_initI2CBus(LED_MATRIX_IDX);
     I2C_writeByteToI2CReg(LED_MATRIX_IDX, LED_SETUP_REG, WRITE_TURN_ON);
     I2C_writeByteToI2CReg(LED_MATRIX_IDX, DISPLAY_SETUP_REG, WRITE_TURN_ON);
-}
-
-static void checkIntegerBounds(int number)
-{
-    if (number < 0 || number > 99) {
-        printf("Error: unable to display %d, only 2 digit non-negative numbers are supported.\n", number);
-    }
 }
 
 static void displayDigits(unsigned char* buff, unsigned char* firstDigitBytes, unsigned char* secondDigitBytes)
@@ -60,18 +69,18 @@ static void displayDigits(unsigned char* buff, unsigned char* firstDigitBytes, u
     I2C_writeBytesToI2CReg(LED_MATRIX_IDX, DISPLAY_REG, buff, BUFF_SIZE);
 }
 
-void LEDMatrix_displayInt(int number) 
+static void displayInt(int number) 
 {
     // error handling
-    checkIntegerBounds(number);
+    if (number < 0 || number > 99) {
+        displayInt(99);
+        return;
+    }
 
     // determine which digits need to be displayed and get the bit patterns for them
     const int FIRST_DIGIT = number / 10;
     const int SECOND_DIGIT = number % 10;
-    unsigned char* firstDigitBytes = {0x00};
-    if (FIRST_DIGIT != 0) {
-        firstDigitBytes = digits[FIRST_DIGIT].bytes;   
-    }
+    unsigned char* firstDigitBytes = digits[FIRST_DIGIT].bytes;   
     unsigned char* secondDigitBytes = digits[SECOND_DIGIT].bytes;
 
     // initialize byte array for the I2C register
@@ -79,16 +88,13 @@ void LEDMatrix_displayInt(int number)
     displayDigits(buff, firstDigitBytes, secondDigitBytes);
 }
 
-static void checkFloatBounds(float number) {
-    if (number < 0 || number >= 10) {
-        printf("Error: unable to display %f, only 2 digit non-negative numbers are supported.\n", number);
-    }
-}
-
-void LEDMatrix_displayFloat(float number)
+static void displayFloat(float number)
 {
     // error handling
-    checkFloatBounds(number);
+    if (number < 0 || number >= 10) {
+        displayFloat(9.9);
+        return;
+    }
 
     // determine which digits need to be displayed and get the bit patterns for them
     const int FIRST_DIGIT = (int) number;
@@ -101,8 +107,59 @@ void LEDMatrix_displayFloat(float number)
     displayDigits(buff, firstDigitBytes, secondDigitBytes);
 }
 
-void LEDMatrix_clearDisplay(void)
+void LEDMatrix_updateDisplayValues(int numDips, int maxVoltage, int minVoltage, long long minTimeIntreval, long long maxTimeIntreval)
+{
+    pthread_mutex_lock(&mutex);
+    {
+        numberDips = numDips;
+        maxVolts = maxVoltage;
+        minVolts = minVoltage;
+        minIntreval = minTimeIntreval;
+        maxIntreval = maxTimeIntreval;
+    }
+    pthread_mutex_unlock(&mutex);
+}
+
+void* displaySampleData(void* args)
+{
+    Sleep_waitForMs(1001);
+    while(!shutdown) {
+        pthread_mutex_lock(&mutex);
+        {
+            if(!shutdown) {
+                if (Joystick_up()) {
+                    displayFloat(maxVolts);
+                } else if (Joystick_down()) {
+                    displayFloat(minVolts);
+                } else if (Joystick_left()) {
+                    displayFloat(minIntreval);
+                } else if (Joystick_right()) {
+                    displayFloat(maxIntreval);
+                } else {
+                    displayInt(numberDips);
+                }
+            }
+        }
+        pthread_mutex_unlock(&mutex);
+    }
+    pthread_exit(NULL);
+}
+
+void LEDMatrix_startDisplay(void)
+{
+    pthread_t tid;
+    pthread_create(&tid, NULL, displaySampleData, NULL);
+}
+
+static void clearDisplay(void)
 {
     unsigned char buff[BUFF_SIZE] = {0x00};
     I2C_writeBytesToI2CReg(LED_MATRIX_IDX, DISPLAY_REG, buff, BUFF_SIZE);
+}
+
+void LEDMatrix_stopRunning(void)
+{
+    shutdown = true;
+    clearDisplay();
+    pthread_mutex_unlock(&mutex);
 }

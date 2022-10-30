@@ -21,7 +21,7 @@ void waitForUserButtonPress(void)
 void safeShutdown(void)
 {
     Sampler_stopSampling();
-    LEDMatrix_clearDisplay();
+    LEDMatrix_stopRunning();
 }
 
 int main(void) {
@@ -30,8 +30,12 @@ int main(void) {
     UserButton_initButton();
     LEDMatrix_initMatrix();
     
-    // Start the sampling threads
+    // // Start the sampling threads
     Sampler_startSampling();
+
+    // // Initiate real time display on the LED Matrix
+    LEDMatrix_startDisplay();
+
 
     waitForUserButtonPress();
 

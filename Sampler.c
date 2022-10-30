@@ -1,19 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 #include "Sleep.h"
+#include "A2D.h"
+#include "Stats.h"
+#include "LEDMatrix.h"
+#include "sample_t.h"
 
 #define MAX_NUM_SAMPLES 1024
 #define PHOTORESISTOR_AIN 1
 #define STORE_SAMPLE_DELAY_MS 1
 #define ANALYZE_SAMPLES_DELAY_MS 1000
-
-typedef struct {
-    int voltage;
-    long long timestampNanoSec;
-} sample_t;
 
 static sample_t buffer[MAX_NUM_SAMPLES];
 static int numSamples = 0;
@@ -25,7 +25,10 @@ static long long getTimeInNs(void)
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
     long long seconds = spec.tv_sec;
-    return spec.tv_nsec;
+    long long nanoSeconds = spec.tv_nsec;
+    long long timestamp = seconds * 1000000000
+    + nanoSeconds;
+    return timestamp;
 }
 
 static void addSample(sample_t sample)
@@ -39,69 +42,57 @@ static void addSample(sample_t sample)
     pthread_mutex_unlock(&mutex);
 }
 
-static int calculateAverageVoltage()
-{
-    return 0;
-}
-
-static int findMaxVoltage()
-{
-    return 0;
-}
-
-static int findMinVoltage()
-{
-    return 0;
-}
-
-static int calculateNumDips()
-{
-    return 0;
-}
-
-static long long calculateAverageTimeIntreval()
-{
-    return 0;
-}
-
-static long long findMaxTimeIntreval()
-{
-    return 0;
-}
-
-static long long findMinTimeIntreval()
-{
-    return 0;
-}
-
 void* storeSamples(void* arg)
 {
+    long long startTime = getTimeInNs();
+
     while(!shutdown) {
-        char* photoresistorReading = A2D_readVoltage(PHOTORESISTOR_AIN);
-        int voltage = atoi(photoresistorReading);
-        sample_t sample = {voltage, getTimeInNs()};
+        int photoresistorReading = A2D_readVoltage(PHOTORESISTOR_AIN);
+        long long timestampNs = getTimeInNs() - startTime;
+        sample_t sample = {photoresistorReading, timestampNs};
         addSample(sample);
         Sleep_waitForMs(STORE_SAMPLE_DELAY_MS);
     }
     pthread_exit(NULL);
 }
 
+static void clearBuffer()
+{
+    memset(buffer, 0, MAX_NUM_SAMPLES*sizeof(sample_t));
+    numSamples = 0;
+}
+
 void* analyzeSamples(void* arg)
 {
+    int numDips;
+    float maxVoltage;
+    float minVoltage;
+    long long minTimeIntreval;
+    long long maxTimeIntreval;
+
     while(!shutdown) {
         Sleep_waitForMs(ANALYZE_SAMPLES_DELAY_MS);
         pthread_mutex_lock(&mutex);
         {
-            int avgVoltage = calculateAverage();
-            int maxVoltage = findMaxVoltage();
-            int minVoltage = findMinVoltage();
-            int numDips = calculateNumDips();
-            long long avgTimeIntreval = calculateAverageTimeIntreval();
-            long long maxTimeIntreval = findMaxTimeIntreval();
-            long long minTimeIntreval = findMinTimeIntreval();
+            if (!shutdown) {
+                numDips = Stats_calcNumDips(buffer, numSamples);
+                maxVoltage = Stats_findMaxVoltage(buffer, numSamples);
+                minVoltage = Stats_findMinVoltage(buffer, numSamples);
+                minTimeIntreval = Stats_findMinTimeIntreval(buffer, numSamples);
+                maxTimeIntreval = Stats_findMaxTimeIntreval(buffer, numSamples);
+                float avgVoltage = Stats_calcAverageVoltage(buffer, numSamples);
+                long long avgTimeIntreval = Stats_calcAverageTimeIntreval(buffer, numSamples);
+                printf("Intreval ms (%f, %f) avg = %f Samples V (%f, %f) avg = %f Dips: %d Samples: %d\n"
+                    , minTimeIntreval, maxTimeIntreval, avgTimeIntreval, minVoltage, maxVoltage, avgVoltage
+                    ,  numDips, numSamples);
+                clearBuffer();
+            }
         }
         pthread_mutex_unlock(&mutex);
+
+        LEDMatrix_updateDisplayValues(numDips, maxVoltage, minVoltage, minTimeIntreval, maxTimeIntreval);
     }
+    pthread_exit(NULL);
 }
 
 void Sampler_startSampling(void)
@@ -110,7 +101,7 @@ void Sampler_startSampling(void)
     pthread_create(&storeSamplesTid, NULL, storeSamples, NULL);
 
     pthread_t analyzeSamplesTid;
-    //TODO create analyzer thread
+    pthread_create(&analyzeSamplesTid, NULL, analyzeSamples, NULL);
 }
 
 void Sampler_stopSampling(void)

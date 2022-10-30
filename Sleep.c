@@ -1,6 +1,6 @@
 #include <time.h>
 
-static void Sleep_waitForMs(long long delayInMs)
+void Sleep_waitForMs(long long delayInMs)
 {
     const long long NS_PER_MS = 1000 * 1000;
     const long long NS_PER_SECOND = 1000000000;

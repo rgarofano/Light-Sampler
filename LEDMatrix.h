@@ -4,8 +4,8 @@
 #define LEDMATRIX_H
 
 void LEDMatrix_initMatrix(void);
-void LEDMatrix_displayInt(int number);
-void LEDMatrix_displayFloat(float number);
-void LEDMatrix_clearDisplay(void);
+void LEDMatrix_startDisplay(void);
+void LEDMatrix_updateDisplayValues(int numDips, int maxVoltage, int minVoltage, long long minTimeIntreval, long long maxTimeIntreval);
+void LEDMatrix_stopRunning(void);
 
 #endif

@@ -38,5 +38,7 @@ void GPIO_setInput(const int INDEX)
 char *GPIO_readValue(const int INDEX) {
     char* valuePath = gpioDevices[INDEX].valuePath;
     FILE* pFile = File_getFilePointer(valuePath, "r", "value");
-    return File_extractFileContents(pFile);
+    char* value = File_extractFileContents(pFile);
+    fclose(pFile);
+    return value;
 }
