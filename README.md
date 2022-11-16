@@ -20,7 +20,7 @@ The program computes and prints the following data to the console every second
   - Number of times the photoresitor was sampled
   - Minimum, maximum, and average time between samples
 
-Additionally the LED matrix also displays some information
+Additionally the LED matrix displays some of the statistics
   - Joystick centered -> number of dips
   - Joystick 'UP' -> maximum voltage reading
   - Joystick 'DOWN' -> minimum voltage reading
