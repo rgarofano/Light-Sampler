@@ -6,7 +6,7 @@ Hardware Configuration:
 
 BeagleBone Green Board - USB tethered to a host computer
 
-Photoresitor - connected with a 10kohm resistor to form a voltage divider
+Photoresitor - connected with a 10kohm resistor to form a voltage divider which is read via A2D on the board
 
 Adafruit Miniature 8x8 Yellow-Green LED Matrix - Connected via I2C to the board
 
